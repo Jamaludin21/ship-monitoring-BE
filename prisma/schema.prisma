@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // url TIDAK BOLEH ADA DI SINI LAGI
+}
+
+// Mendefinisikan Role Pengguna
+enum Role {
+  ADMIN
+  MANAGER
+  NAHKODA
+}
+
+// Mendefinisikan Status Pengajuan
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      Role
+  name      String
+  createdAt DateTime @default(now())
+  
+  ships     Ship[]
+}
+
+model Ship {
+  id          String   @id @default(uuid())
+  name        String
+  captainId   String
+  captain     User     @relation(fields: [captainId], references: [id])
+  
+  submissions Submission[]
+  locations   Location[]
+}
+
+model Submission {
+  id           String   @id @default(uuid())
+  shipId       String
+  ship         Ship     @relation(fields: [shipId], references: [id])
+  status       Status   @default(PENDING)
+  documentUrl  String   
+  submittedAt  DateTime @default(now())
+  reviewedAt   DateTime?
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  shipId    String
+  ship      Ship     @relation(fields: [shipId], references: [id])
+  latitude  Float
+  longitude Float
+  updatedAt DateTime @default(now())
+}
