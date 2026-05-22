@@ -1,205 +1,340 @@
-import { PrismaClient, Role, Status } from '@prisma/client'
+import { Role, Status } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import * as dotenv from 'dotenv'
-import { Pool } from 'pg'
-import { PrismaPg } from '@prisma/adapter-pg'
+import prisma from '../utils/prisma'
 
-// 1. Inisialisasi Environment
-dotenv.config()
+const passwordPlain = 'password'
+const dummyPdfUrl =
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
 
-if (!process.env.DATABASE_URL) {
-  console.error(
-    '❌ Error: DATABASE_URL tidak ditemukan. Pastikan file .env sudah ada.'
-  )
-  process.exit(1)
+function daysAgo (days: number): Date {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date
 }
 
-// 2. Inisialisasi Prisma dengan Driver Adapter PG
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-const adapter = new PrismaPg(pool)
-const prisma = new PrismaClient({ adapter })
+function minutesAgo (minutes: number): Date {
+  const date = new Date()
+  date.setMinutes(date.getMinutes() - minutes)
+  return date
+}
 
 async function main () {
-  console.log('⏳ Memulai proses seeding data komprehensif...')
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seeder ini tidak boleh dijalankan di production')
+  }
 
-  // Hapus data lama (Reset) dari tabel paling ujung (child) ke paling atas (parent)
+  console.log('Membersihkan data lama...')
+
   await prisma.location.deleteMany()
   await prisma.submission.deleteMany()
   await prisma.ship.deleteMany()
   await prisma.user.deleteMany()
 
-  const salt = await bcrypt.genSalt(10)
-  const defaultPassword = await bcrypt.hash('password123', salt)
+  console.log('Membuat user...')
 
-  // ==========================================
-  // 1. SEED AKUN ADMIN & MANAGER
-  // ==========================================
-  await prisma.user.create({
+  const hashedPassword = await bcrypt.hash(passwordPlain, 10)
+
+  const admin = await prisma.user.create({
     data: {
       username: 'admin1',
-      password: defaultPassword,
+      password: hashedPassword,
       role: Role.ADMIN,
-      name: 'Admin Pelabuhan Pusat'
+      name: 'Admin Pelabuhan'
     }
   })
 
-  await prisma.user.create({
+  const manager = await prisma.user.create({
     data: {
       username: 'manager1',
-      password: defaultPassword,
+      password: hashedPassword,
       role: Role.MANAGER,
-      name: 'Manager Operasional'
+      name: 'Manager Pelabuhan'
     }
   })
 
-  // ==========================================
-  // 2. SEED AKUN NAHKODA & KAPALNYA
-  // ==========================================
-
-  // Nahkoda 1: KM. Kelud (Kasus: Sedang berlayar menuju pelabuhan, status pengajuan APPROVED)
-  const nahkoda1 = await prisma.user.create({
+  const nahkodaAktif = await prisma.user.create({
     data: {
-      username: 'nahkoda_kelud',
-      password: defaultPassword,
+      username: 'nahkoda1',
+      password: hashedPassword,
       role: Role.NAHKODA,
-      name: 'Kapten Haris',
-      ships: { create: [{ name: 'KM. Kelud' }] }
-    },
-    include: { ships: true }
+      name: 'Budi Santoso'
+    }
   })
 
-  // Nahkoda 2: KM. Awu (Kasus: Baru mau mengajukan dokumen, status PENDING)
-  const nahkoda2 = await prisma.user.create({
+  const nahkodaHistory = await prisma.user.create({
     data: {
-      username: 'nahkoda_awu',
-      password: defaultPassword,
+      username: 'nahkoda2',
+      password: hashedPassword,
       role: Role.NAHKODA,
-      name: 'Kapten Rudi',
-      ships: { create: [{ name: 'KM. Awu' }] }
-    },
-    include: { ships: true }
+      name: 'Andi Wijaya'
+    }
   })
 
-  // Nahkoda 3: KM. Dobonsolo (Kasus: Dokumen ditolak, dan belum pernah menyalakan GPS)
-  const nahkoda3 = await prisma.user.create({
+  const nahkodaRejected = await prisma.user.create({
     data: {
-      username: 'nahkoda_dobonsolo',
-      password: defaultPassword,
+      username: 'nahkoda3',
+      password: hashedPassword,
       role: Role.NAHKODA,
-      name: 'Kapten Junaidi',
-      ships: { create: [{ name: 'KM. Dobonsolo' }] }
-    },
-    include: { ships: true }
+      name: 'Rudi Hartono'
+    }
   })
 
-  // ==========================================
-  // 3. SEED DOKUMEN PENGAJUAN (SUBMISSIONS)
-  // ==========================================
+  const nahkodaTanpaLokasi = await prisma.user.create({
+    data: {
+      username: 'nahkoda4',
+      password: hashedPassword,
+      role: Role.NAHKODA,
+      name: 'Dedi Kurniawan'
+    }
+  })
 
-  // Dokumen dummy URL (Bisa diganti dengan link cloudinary beneran nanti)
-  const dummyDocUrl =
-    'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+  const nahkodaTanpaPengajuan = await prisma.user.create({
+    data: {
+      username: 'nahkoda5',
+      password: hashedPassword,
+      role: Role.NAHKODA,
+      name: 'Agus Salim'
+    }
+  })
+
+  const nahkodaTanpaKapal = await prisma.user.create({
+    data: {
+      username: 'nahkoda_no_ship',
+      password: hashedPassword,
+      role: Role.NAHKODA,
+      name: 'Nahkoda Tanpa Kapal'
+    }
+  })
+
+  console.log('Membuat kapal...')
+
+  const kapalAktifPending = await prisma.ship.create({
+    data: {
+      shipNumber: 'KM-001',
+      name: 'Kapal Nusantara Jaya',
+      captainId: nahkodaAktif.id
+    }
+  })
+
+  const kapalHistoryApproved = await prisma.ship.create({
+    data: {
+      shipNumber: 'KM-002',
+      name: 'Kapal Samudra Abadi',
+      captainId: nahkodaHistory.id
+    }
+  })
+
+  const kapalRejected = await prisma.ship.create({
+    data: {
+      shipNumber: 'KM-003',
+      name: 'Kapal Laut Sejahtera',
+      captainId: nahkodaRejected.id
+    }
+  })
+
+  const kapalTanpaLokasi = await prisma.ship.create({
+    data: {
+      shipNumber: 'KM-004',
+      name: 'Kapal Bintang Timur',
+      captainId: nahkodaTanpaLokasi.id
+    }
+  })
+
+  const kapalTanpaPengajuan = await prisma.ship.create({
+    data: {
+      shipNumber: 'KM-005',
+      name: 'Kapal Merah Putih',
+      captainId: nahkodaTanpaPengajuan.id
+    }
+  })
+
+  console.log('Membuat lokasi kapal...')
+
+  await prisma.location.createMany({
+    data: [
+      {
+        shipId: kapalAktifPending.id,
+        latitude: -6.1021,
+        longitude: 106.8833,
+        createdAt: minutesAgo(1)
+      },
+      {
+        shipId: kapalAktifPending.id,
+        latitude: -6.103,
+        longitude: 106.884,
+        createdAt: minutesAgo(3)
+      },
+      {
+        shipId: kapalHistoryApproved.id,
+        latitude: -6.11,
+        longitude: 106.89,
+        createdAt: minutesAgo(2)
+      },
+      {
+        shipId: kapalRejected.id,
+        latitude: -6.12,
+        longitude: 106.9,
+        createdAt: minutesAgo(30)
+      },
+      {
+        shipId: kapalTanpaPengajuan.id,
+        latitude: -6.13,
+        longitude: 106.91,
+        createdAt: minutesAgo(5)
+      }
+    ]
+  })
+
+  console.log('Membuat pengajuan berlabuh...')
 
   await prisma.submission.createMany({
     data: [
       {
-        shipId: nahkoda1.ships[0].id,
-        documentUrl: dummyDocUrl,
+        shipId: kapalAktifPending.id,
+        captainName: 'Budi Santoso',
+        employeeCount: 12,
+        cargo: 'Batu Bara',
+        cargoAmount: '250 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
+        status: Status.PENDING,
+        submittedAt: daysAgo(0)
+      },
+      {
+        shipId: kapalHistoryApproved.id,
+        captainName: 'Andi Wijaya',
+        employeeCount: 15,
+        cargo: 'Semen',
+        cargoAmount: '180 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
         status: Status.APPROVED,
-        reviewedAt: new Date()
+        submittedAt: daysAgo(7),
+        reviewedAt: daysAgo(6),
+        reviewedBy: admin.id
       },
       {
-        shipId: nahkoda2.ships[0].id,
-        documentUrl: dummyDocUrl,
-        status: Status.PENDING
+        shipId: kapalHistoryApproved.id,
+        captainName: 'Andi Wijaya',
+        employeeCount: 14,
+        cargo: 'Besi',
+        cargoAmount: '120 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
+        status: Status.APPROVED,
+        submittedAt: daysAgo(20),
+        reviewedAt: daysAgo(19),
+        reviewedBy: admin.id
       },
       {
-        shipId: nahkoda3.ships[0].id,
-        documentUrl: dummyDocUrl,
+        shipId: kapalHistoryApproved.id,
+        captainName: 'Andi Wijaya',
+        employeeCount: 16,
+        cargo: 'Pupuk',
+        cargoAmount: '95 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
+        status: Status.PENDING,
+        submittedAt: daysAgo(1)
+      },
+      {
+        shipId: kapalRejected.id,
+        captainName: 'Rudi Hartono',
+        employeeCount: 10,
+        cargo: 'Minyak Kelapa Sawit',
+        cargoAmount: '300 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
         status: Status.REJECTED,
-        reviewedAt: new Date()
+        reviewNote:
+          'Dokumen Sertifikat Keselamatan belum jelas dan perlu diunggah ulang.',
+        submittedAt: daysAgo(3),
+        reviewedAt: daysAgo(2),
+        reviewedBy: admin.id
+      },
+      {
+        shipId: kapalTanpaLokasi.id,
+        captainName: 'Dedi Kurniawan',
+        employeeCount: 8,
+        cargo: 'Bahan Pokok',
+        cargoAmount: '75 Ton',
+        sailingPermitUrl: dummyPdfUrl,
+        callSignCertificateUrl: dummyPdfUrl,
+        safetyCertificateUrl: dummyPdfUrl,
+        radioStationPermitUrl: dummyPdfUrl,
+        status: Status.PENDING,
+        submittedAt: daysAgo(2)
       }
     ]
   })
 
-  // ==========================================
-  // 4. SEED LOKASI GPS (Riwayat Pergerakan Kapal)
-  // ==========================================
-
-  const now = new Date()
-
-  // Riwayat KM. Kelud (Punya 3 titik lokasi untuk mensimulasikan pergerakan menuju Tj Priok)
-  await prisma.location.createMany({
-    data: [
-      // 20 menit lalu (Jauh dari pelabuhan)
-      {
-        shipId: nahkoda1.ships[0].id,
-        latitude: -5.9,
-        longitude: 106.8,
-        updatedAt: new Date(now.getTime() - 20 * 60000)
-      },
-      // 10 menit lalu (Mendekat)
-      {
-        shipId: nahkoda1.ships[0].id,
-        latitude: -6.0,
-        longitude: 106.85,
-        updatedAt: new Date(now.getTime() - 10 * 60000)
-      },
-      // SEKARANG (Titik terbaru yang akan muncul di Peta Manager) - Tanjung Priok
-      {
-        shipId: nahkoda1.ships[0].id,
-        latitude: -6.1021,
-        longitude: 106.8833,
-        updatedAt: now
-      }
-    ]
-  })
-
-  // Riwayat KM. Awu (Hanya 1 titik lokasi, kapal sedang diam / berlabuh di titik lain)
-  await prisma.location.create({
-    data: {
-      shipId: nahkoda2.ships[0].id,
-      latitude: -6.115,
-      longitude: 106.87,
-      updatedAt: now
+  console.log('Seed selesai.')
+  console.log('Akun test:')
+  console.table([
+    {
+      role: 'ADMIN',
+      username: 'admin1',
+      password: passwordPlain
+    },
+    {
+      role: 'MANAGER',
+      username: 'manager1',
+      password: passwordPlain
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda1',
+      password: passwordPlain,
+      case: 'Kapal aktif, punya lokasi terbaru, punya pengajuan PENDING'
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda2',
+      password: passwordPlain,
+      case: 'Kapal punya banyak history APPROVED dan PENDING'
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda3',
+      password: passwordPlain,
+      case: 'Kapal punya history REJECTED'
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda4',
+      password: passwordPlain,
+      case: 'Kapal punya pengajuan tapi belum punya live location'
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda5',
+      password: passwordPlain,
+      case: 'Kapal punya live location tapi belum ada pengajuan'
+    },
+    {
+      role: 'NAHKODA',
+      username: 'nahkoda_no_ship',
+      password: passwordPlain,
+      case: 'Nahkoda tidak punya kapal'
     }
-  })
-
-  // KM. Dobonsolo sengaja TIDAK DIBERI DATA LOKASI untuk menguji apakah sistem crash jika array kosong.
-
-  console.log('✅ Seeding Selesai!')
-  console.log('====================================================')
-  console.log('   DATA PENGUJIAN APLIKASI (Gunakan untuk Login)')
-  console.log('====================================================')
-  console.log(`[NAHKODA 1 - KM. Kelud]`)
-  console.log(`- Kondisi   : GPS Aktif (3 Riwayat), Dokumen APPROVED`)
-  console.log(`- Username  : nahkoda_kelud`)
-  console.log(`- Password  : password123`)
-  console.log(`- ID Kapal  : ${nahkoda1.ships[0].id}\n`)
-
-  console.log(`[NAHKODA 2 - KM. Awu]`)
-  console.log(`- Kondisi   : GPS Aktif (1 Titik), Dokumen PENDING`)
-  console.log(`- Username  : nahkoda_awu\n`)
-
-  console.log(`[NAHKODA 3 - KM. Dobonsolo]`)
-  console.log(`- Kondisi   : GPS MATI (Blank), Dokumen REJECTED`)
-  console.log(`- Username  : nahkoda_dobonsolo\n`)
-
-  console.log(`[MANAGER]`)
-  console.log(`- Kondisi   : Akan melihat 2 Kapal di Peta (Kelud & Awu)`)
-  console.log(`- Username  : manager1\n`)
-
-  console.log(`[ADMIN]`)
-  console.log(`- Username  : admin1`)
-  console.log('====================================================')
+  ])
 }
 
 main()
-  .catch(e => {
-    console.error(e)
+  .catch(error => {
+    console.error('Seed gagal:', error)
     process.exit(1)
   })
   .finally(async () => {
     await prisma.$disconnect()
-    await pool.end()
   })

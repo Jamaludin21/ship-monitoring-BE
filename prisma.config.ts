@@ -2,7 +2,7 @@ import { defineConfig } from '@prisma/config'
 import * as dotenv from 'dotenv'
 
 // Paksa membaca file .env
-dotenv.config()
+dotenv.config({ quiet: true })
 
 // Beri validasi agar jika .env kosong/salah, error-nya lebih jelas
 if (!process.env.DATABASE_URL) {

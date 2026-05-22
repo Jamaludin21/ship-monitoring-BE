@@ -1,0 +1,28 @@
+import multer from 'multer'
+
+const storage = multer.memoryStorage()
+
+const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
+  const allowedMimeTypes = ['application/pdf']
+
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    return cb(new Error('File harus berformat PDF'))
+  }
+
+  cb(null, true)
+}
+
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  }
+})
+
+export const uploadSubmissionFiles = upload.fields([
+  { name: 'sailingPermit', maxCount: 1 },
+  { name: 'callSignCertificate', maxCount: 1 },
+  { name: 'safetyCertificate', maxCount: 1 },
+  { name: 'radioStationPermit', maxCount: 1 }
+])

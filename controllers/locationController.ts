@@ -1,62 +1,117 @@
-import { Request, Response } from 'express';
-import prisma from '../utils/prisma';
+import { Response } from 'express'
+import prisma from '../utils/prisma'
+import { AuthRequest } from '../middlewares/authMiddleware'
 
-// 1. Fungsi untuk Nahkoda (Mengirim lokasi secara berkala)
-export const updateLocation = async (req: Request, res: Response): Promise<void> => {
+export const updateLocation = async (req: AuthRequest, res: Response) => {
   try {
-    const { shipId, latitude, longitude } = req.body;
+    const userId = req.user!.id
+    const latitude = Number(req.body.latitude)
+    const longitude = Number(req.body.longitude)
 
-    if (!shipId || latitude === undefined || longitude === undefined) {
-      res.status(400).json({ message: "Data lokasi tidak lengkap" });
-      return;
+    if (req.body.latitude === undefined || req.body.longitude === undefined) {
+      return res.status(400).json({
+        message: 'Latitude dan longitude wajib diisi'
+      })
     }
 
-    // Best Practice: Simpan sebagai riwayat baru setiap kali Nahkoda mengirim lokasi
-    // Ini bagus untuk skripsi jika dosen bertanya "Apakah rute kapal terekam?"
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        message: 'Latitude dan longitude harus berupa angka'
+      })
+    }
+
+    if (
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        message: 'Koordinat tidak valid'
+      })
+    }
+
+    const ship = await prisma.ship.findFirst({
+      where: {
+        captainId: userId
+      }
+    })
+
+    if (!ship) {
+      return res.status(404).json({
+        message: 'Kapal tidak ditemukan'
+      })
+    }
+
     await prisma.location.create({
       data: {
-        shipId,
+        shipId: ship.id,
         latitude,
         longitude
       }
-    });
+    })
 
-    res.status(200).json({ message: "Lokasi berhasil diperbarui" });
-  } catch (error) {
-    console.error("Error Update Location:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server saat update lokasi" });
+    return res.status(200).json({
+      message: 'Lokasi berhasil diperbarui'
+    })
+  } catch {
+    return res.status(500).json({
+      message: 'Gagal memperbarui lokasi'
+    })
   }
-};
+}
 
-// 2. Fungsi untuk Manager (Mengambil posisi terakhir dari setiap kapal)
-export const getAllShipLocations = async (req: Request, res: Response): Promise<void> => {
+export const getAllShipLocations = async (req: AuthRequest, res: Response) => {
   try {
-    // Best Practice Prisma: Ambil semua data kapal beserta relasi lokasinya, 
-    // TAPI cukup ambil 1 data lokasi terbaru (descending) untuk mengefisienkan RAM/Bandwidth
     const ships = await prisma.ship.findMany({
       include: {
+        captain: {
+          select: {
+            id: true,
+            name: true,
+            username: true
+          }
+        },
         locations: {
           orderBy: {
-            updatedAt: 'desc' // Urutkan dari yang paling baru
+            createdAt: 'desc'
           },
-          take: 1 // Ambil 1 teratas saja (titik live location saat ini)
+          take: 1
+        },
+        submissions: {
+          orderBy: {
+            submittedAt: 'desc'
+          },
+          take: 1
         }
+      },
+      orderBy: {
+        name: 'asc'
       }
-    });
+    })
 
-    // Format (Mapping) struktur JSON agar sesuai dengan data class `ShipLocation` di Android Kotlin Anda
-    const formattedData = ships
-      .filter(ship => ship.locations.length > 0) // Abaikan kapal yang belum pernah menyalakan GPS
+    const data = ships
+      .filter(ship => ship.locations.length > 0)
       .map(ship => ({
         shipId: ship.id,
+        shipNumber: ship.shipNumber,
         shipName: ship.name,
+        captain: ship.captain,
         latitude: ship.locations[0].latitude,
-        longitude: ship.locations[0].longitude
-      }));
+        longitude: ship.locations[0].longitude,
+        updatedAt: ship.locations[0].createdAt,
+        latestSubmission: ship.submissions[0] ?? null
+      }))
 
-    res.status(200).json(formattedData);
+    return res.status(200).json({
+      message: 'Lokasi kapal berhasil diambil',
+      data
+    })
   } catch (error) {
-    console.error("Error Get Locations:", error);
-    res.status(500).json({ message: "Terjadi kesalahan server saat mengambil data lokasi" });
+    console.error(error)
+
+    return res.status(500).json({
+      message: 'Gagal mengambil lokasi kapal'
+    })
   }
-};
+}

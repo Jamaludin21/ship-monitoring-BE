@@ -1,15 +1,24 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import '../utils/env'
 import prisma from '../utils/prisma'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'rahasia_skripsi_super_aman'
+const JWT_SECRET = process.env.JWT_SECRET
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is required')
+}
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password } = req.body
 
-    // 1. Cari user di database
+    if (!username || !password) {
+      res.status(400).json({ message: 'Username dan password wajib diisi' })
+      return
+    }
+
     const user = await prisma.user.findUnique({
       where: { username },
       include: { ships: true }
@@ -19,19 +28,19 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    // 2. Verifikasi Password (Di production, password harus di-hash saat register)
     const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
       res.status(401).json({ message: 'Password salah' })
       return
     }
 
-    // 3. Buat Token JWT
     const token = jwt.sign(
       { id: user.id, role: user.role },
       JWT_SECRET,
-      { expiresIn: '1d' } // Token berlaku 1 hari
+      { expiresIn: '1d' }
     )
+
+    const primaryShip = user.ships[0] ?? null
 
     res.status(200).json({
       message: 'Login berhasil',
@@ -40,7 +49,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         name: user.name,
         role: user.role,
-        shipId: user.ships.length > 0 ? user.ships[0].id : null
+        shipId: primaryShip?.id ?? null,
+        shipNumber: primaryShip?.shipNumber ?? null,
+        shipName: primaryShip?.name ?? null
       }
     })
   } catch (error) {
