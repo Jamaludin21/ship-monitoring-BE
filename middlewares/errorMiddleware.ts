@@ -28,7 +28,7 @@ export const errorMiddleware = (
   if (error instanceof multer.MulterError) {
     const message =
       error.code === 'LIMIT_FILE_SIZE'
-        ? 'Ukuran file maksimal 5MB'
+        ? 'Ukuran file maksimal 4MB'
         : 'Gagal memproses file'
 
     logProcessError(

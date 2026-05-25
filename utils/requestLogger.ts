@@ -128,7 +128,7 @@ export const getRequestLogContext = (
   return {
     requestId: req.requestId,
     method: req.method,
-    path: req.originalUrl || req.url,
+    path: req.requestPath || req.path || (req.originalUrl || req.url).split('?')[0],
     params: sanitizeForLog(req.params),
     query: sanitizeForLog(req.query),
     userId,

@@ -6,7 +6,11 @@ import {
   navigationInspectionChecklist,
   navigationInspectionItemNumbers
 } from '../services/navigationInspectionChecklist'
-import { uploadToCloudinary } from '../services/cloudinaryService'
+import {
+  isBlobStorageConfigError,
+  uploadToPrivateBlob
+} from '../services/blobStorageService'
+import { buildDocumentDownloadUrl } from '../services/documentAccessService'
 import prisma from '../utils/prisma'
 
 type ParsedInspectionItem = {
@@ -173,6 +177,24 @@ const getArrivalInspectionFiles = (req: AuthRequest) => {
   }
 }
 
+const formatArrivalInspectionDocumentUrls = (
+  req: AuthRequest,
+  inspection: any
+) => {
+  if (!inspection) {
+    return inspection
+  }
+
+  return {
+    ...inspection,
+    inspectionDocumentUrl: buildDocumentDownloadUrl(
+      req,
+      inspection.inspectionDocumentUrl
+    ),
+    responseLetterUrl: buildDocumentDownloadUrl(req, inspection.responseLetterUrl)
+  }
+}
+
 export const getArrivalInspectionChecklist = async (
   req: AuthRequest,
   res: Response
@@ -228,7 +250,7 @@ export const getArrivalInspection = async (
 
     return res.status(200).json({
       message: 'Hasil cek kapal berhasil diambil',
-      data: submission.arrivalInspection
+      data: formatArrivalInspectionDocumentUrls(req, submission.arrivalInspection)
     })
   } catch (error) {
     console.error(error)
@@ -312,13 +334,13 @@ export const upsertArrivalInspection = async (
 
     const [inspectionDocumentUrl, responseLetterUrl] = await Promise.all([
       inspectionDocument
-        ? uploadToCloudinary(
+        ? uploadToPrivateBlob(
             inspectionDocument,
             'ship-monitoring/arrival-inspections'
           )
         : Promise.resolve(undefined),
       responseLetter
-        ? uploadToCloudinary(
+        ? uploadToPrivateBlob(
             responseLetter,
             'ship-monitoring/response-letters'
           )
@@ -377,17 +399,14 @@ export const upsertArrivalInspection = async (
 
     return res.status(submission.arrivalInspection ? 200 : 201).json({
       message: 'Hasil cek kapal berhasil disimpan',
-      data: inspection
+      data: formatArrivalInspectionDocumentUrls(req, inspection)
     })
   } catch (error) {
     console.error(error)
 
-    if (
-      error instanceof Error &&
-      error.message === 'Cloudinary environment variables are required'
-    ) {
+    if (isBlobStorageConfigError(error)) {
       return res.status(500).json({
-        message: 'Konfigurasi Cloudinary belum lengkap'
+        message: 'Konfigurasi Vercel Blob belum lengkap'
       })
     }
 

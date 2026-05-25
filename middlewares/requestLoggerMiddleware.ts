@@ -12,6 +12,7 @@ declare global {
     interface Request {
       requestId?: string
       requestStartedAt?: number
+      requestPath?: string
     }
   }
 }
@@ -35,6 +36,7 @@ export const requestLogger = (
 
   req.requestId = requestId
   req.requestStartedAt = Date.now()
+  req.requestPath = (req.originalUrl || req.url).split('?')[0]
   res.setHeader('X-Request-Id', requestId)
 
   logProcess(

@@ -1,7 +1,14 @@
 import { Status } from '@prisma/client'
 import { Response } from 'express'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import { uploadToCloudinary } from '../services/cloudinaryService'
+import {
+  isBlobStorageConfigError,
+  uploadToPrivateBlob
+} from '../services/blobStorageService'
+import {
+  formatSubmissionDocumentUrls,
+  formatSubmissionListDocumentUrls
+} from '../services/documentAccessService'
 import prisma from '../utils/prisma'
 
 const submissionInclude = {
@@ -170,10 +177,10 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
       safetyCertificateUrl,
       radioStationPermitUrl
     ] = await Promise.all([
-      uploadToCloudinary(files.sailingPermit[0]),
-      uploadToCloudinary(files.callSignCertificate[0]),
-      uploadToCloudinary(files.safetyCertificate[0]),
-      uploadToCloudinary(files.radioStationPermit[0])
+      uploadToPrivateBlob(files.sailingPermit[0]),
+      uploadToPrivateBlob(files.callSignCertificate[0]),
+      uploadToPrivateBlob(files.safetyCertificate[0]),
+      uploadToPrivateBlob(files.radioStationPermit[0])
     ])
 
     const submission = await prisma.submission.create({
@@ -193,17 +200,14 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
 
     return res.status(201).json({
       message: 'Pengajuan berlabuh berhasil dikirim',
-      data: submission,
+      data: formatSubmissionDocumentUrls(req, submission),
     })
   } catch (error) {
     console.error(error)
 
-    if (
-      error instanceof Error &&
-      error.message === 'Cloudinary environment variables are required'
-    ) {
+    if (isBlobStorageConfigError(error)) {
       return res.status(500).json({
-        message: 'Konfigurasi Cloudinary belum lengkap'
+        message: 'Konfigurasi Vercel Blob belum lengkap'
       })
     }
 
@@ -244,7 +248,7 @@ export const getSubmissions = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({
       message: 'Data pengajuan berhasil diambil',
-      data: submissions
+      data: formatSubmissionListDocumentUrls(req, submissions)
     })
   } catch (error) {
     console.error(error)
@@ -287,7 +291,7 @@ export const getSubmissionDetail = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({
       message: 'Detail pengajuan berhasil diambil',
-      data: submission
+      data: formatSubmissionDocumentUrls(req, submission)
     })
   } catch (error) {
     console.error(error)
@@ -350,7 +354,7 @@ export const getShipHistory = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({
       message: 'History pengajuan kapal berhasil diambil',
-      data: submissions,
+      data: formatSubmissionListDocumentUrls(req, submissions),
       ship
     })
   } catch (error) {
@@ -381,7 +385,7 @@ export const getMySubmissionHistory = async (
 
     return res.status(200).json({
       message: 'History pengajuan berhasil diambil',
-      data: submissions
+      data: formatSubmissionListDocumentUrls(req, submissions)
     })
   } catch (error) {
     console.error(error)
@@ -435,7 +439,7 @@ export const approveSubmission = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({
       message: 'Pengajuan berhasil disetujui',
-      data: updatedSubmission
+      data: formatSubmissionDocumentUrls(req, updatedSubmission)
     })
   } catch (error) {
     console.error(error)
@@ -496,7 +500,7 @@ export const rejectSubmission = async (req: AuthRequest, res: Response) => {
 
     return res.status(200).json({
       message: 'Pengajuan berhasil ditolak',
-      data: updatedSubmission
+      data: formatSubmissionDocumentUrls(req, updatedSubmission)
     })
   } catch (error) {
     console.error(error)
