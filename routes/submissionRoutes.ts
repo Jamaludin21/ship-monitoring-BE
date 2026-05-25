@@ -1,7 +1,15 @@
 import express from 'express'
 import { authenticate } from '../middlewares/authMiddleware'
 import { authorizeRoles } from '../middlewares/roleMiddleware'
-import { uploadSubmissionFiles } from '../middlewares/uploadMiddleware'
+import {
+  uploadArrivalInspectionFiles,
+  uploadSubmissionFiles
+} from '../middlewares/uploadMiddleware'
+import {
+  getArrivalInspectionChecklist,
+  getArrivalInspection,
+  upsertArrivalInspection
+} from '../controllers/arrivalInspectionController'
 import {
   createSubmission,
   getSubmissions,
@@ -29,6 +37,28 @@ router.get(
   authenticate,
   authorizeRoles('NAHKODA'),
   getMySubmissionHistory
+)
+
+router.get(
+  '/arrival-inspection/checklist',
+  authenticate,
+  authorizeRoles('ADMIN', 'MANAGER', 'NAHKODA'),
+  getArrivalInspectionChecklist
+)
+
+router.get(
+  '/:id/arrival-inspection',
+  authenticate,
+  authorizeRoles('ADMIN', 'MANAGER', 'NAHKODA'),
+  getArrivalInspection
+)
+
+router.put(
+  '/:id/arrival-inspection',
+  authenticate,
+  authorizeRoles('ADMIN'),
+  uploadArrivalInspectionFiles,
+  upsertArrivalInspection
 )
 
 router.get(

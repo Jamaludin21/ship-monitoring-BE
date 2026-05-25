@@ -5,6 +5,15 @@ import { uploadToCloudinary } from '../services/cloudinaryService'
 import prisma from '../utils/prisma'
 
 const submissionInclude = {
+  arrivalInspection: {
+    include: {
+      items: {
+        orderBy: {
+          itemNo: 'asc' as const
+        }
+      }
+    }
+  },
   ship: {
     include: {
       captain: {
@@ -47,6 +56,44 @@ const parseStatusQuery = (status: unknown): Status | undefined => {
   }
 
   return normalizedStatus as Status
+}
+
+const buildShipNumberSearchValues = (shipNumber: string) => {
+  const normalizedShipNumber = shipNumber.trim().toUpperCase()
+  const searchValues = [normalizedShipNumber]
+  const numericPart = normalizedShipNumber.replace(/^KM-/, '')
+
+  if (/^\d+$/.test(numericPart)) {
+    const paddedNumber = numericPart.padStart(3, '0')
+
+    searchValues.push(paddedNumber, `KM-${paddedNumber}`)
+  }
+
+  return Array.from(new Set(searchValues)).filter(Boolean)
+}
+
+const buildShipNumberWhere = (shipNumber: string) => {
+  const searchValues = buildShipNumberSearchValues(shipNumber)
+  const numericValue = searchValues.find((value) => /^\d+$/.test(value))
+
+  return {
+    OR: [
+      {
+        shipNumber: {
+          in: searchValues
+        }
+      },
+      ...(numericValue
+        ? [
+            {
+              shipNumber: {
+                endsWith: `-${numericValue}`
+              }
+            }
+          ]
+        : [])
+    ]
+  }
 }
 
 export const createSubmission = async (req: AuthRequest, res: Response) => {
@@ -185,9 +232,7 @@ export const getSubmissions = async (req: AuthRequest, res: Response) => {
         ...(status ? { status } : {}),
         ...(shipNumber
           ? {
-              ship: {
-                shipNumber
-              }
+              ship: buildShipNumberWhere(shipNumber)
             }
           : {})
       },
@@ -255,7 +300,7 @@ export const getSubmissionDetail = async (req: AuthRequest, res: Response) => {
 
 export const getShipHistory = async (req: AuthRequest, res: Response) => {
   try {
-    const shipNumber = getParamValue(req.params.shipNumber)
+    const shipNumber = getParamValue(req.params.shipNumber)?.trim()
 
     if (!shipNumber) {
       return res.status(400).json({
@@ -263,38 +308,50 @@ export const getShipHistory = async (req: AuthRequest, res: Response) => {
       })
     }
 
-    const ship = await prisma.ship.findUnique({
-      where: {
-        shipNumber
-      },
-      include: {
+    const matchingShips = await prisma.ship.findMany({
+      where: buildShipNumberWhere(shipNumber),
+      select: {
+        id: true,
+        shipNumber: true,
+        name: true,
         captain: {
           select: {
             id: true,
             name: true,
             username: true
           }
-        },
-        submissions: {
-          orderBy: {
-            submittedAt: 'desc'
-          }
         }
-      }
+      },
+      take: 2
     })
 
-    if (!ship) {
+    if (matchingShips.length === 0) {
       return res.status(404).json({
         message: 'Kapal tidak ditemukan'
       })
     }
 
+    if (matchingShips.length > 1) {
+      return res.status(409).json({
+        message: 'Nomor kapal terlalu umum, gunakan nomor kapal lengkap'
+      })
+    }
+
+    const ship = matchingShips[0]
+    const submissions = await prisma.submission.findMany({
+      where: {
+        shipId: ship.id
+      },
+      include: submissionInclude,
+      orderBy: {
+        submittedAt: 'desc'
+      }
+    })
+
     return res.status(200).json({
       message: 'History pengajuan kapal berhasil diambil',
-      data: {
-        ship,
-        submissions: ship.submissions
-      }
+      data: submissions,
+      ship
     })
   } catch (error) {
     console.error(error)

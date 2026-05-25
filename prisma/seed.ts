@@ -1,5 +1,6 @@
-import { Role, Status } from '@prisma/client'
+import { InspectionCondition, Role, Status } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { navigationInspectionChecklist } from '../services/navigationInspectionChecklist'
 import prisma from '../utils/prisma'
 
 const passwordPlain = 'password'
@@ -26,6 +27,8 @@ async function main () {
   console.log('Membersihkan data lama...')
 
   await prisma.location.deleteMany()
+  await prisma.navigationInspectionItem.deleteMany()
+  await prisma.arrivalInspection.deleteMany()
   await prisma.submission.deleteMany()
   await prisma.ship.deleteMany()
   await prisma.user.deleteMany()
@@ -277,6 +280,43 @@ async function main () {
       }
     ]
   })
+
+  const inspectedSubmission = await prisma.submission.findFirst({
+    where: {
+      shipId: kapalHistoryApproved.id,
+      status: Status.APPROVED
+    },
+    orderBy: {
+      submittedAt: 'desc'
+    }
+  })
+
+  if (inspectedSubmission) {
+    await prisma.arrivalInspection.create({
+      data: {
+        submissionId: inspectedSubmission.id,
+        inspectionDocumentUrl: dummyPdfUrl,
+        responseLetterUrl: dummyPdfUrl,
+        note: 'Contoh hasil pemeriksaan alat navigasi dan komunikasi.',
+        checkedBy: admin.id,
+        checkedAt: daysAgo(5),
+        items: {
+          create: navigationInspectionChecklist.map((item) => ({
+            itemNo: item.itemNo,
+            question: item.question,
+            condition:
+              item.itemNo === 14
+                ? InspectionCondition.NO
+                : InspectionCondition.YES,
+            note:
+              item.itemNo === 14
+                ? 'NAVTEX perlu pengecekan ulang sebelum keberangkatan.'
+                : null
+          }))
+        }
+      }
+    })
+  }
 
   console.log('Seed selesai.')
   console.log('Akun test:')

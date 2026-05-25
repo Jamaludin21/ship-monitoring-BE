@@ -26,3 +26,8 @@ export const uploadSubmissionFiles = upload.fields([
   { name: 'safetyCertificate', maxCount: 1 },
   { name: 'radioStationPermit', maxCount: 1 }
 ])
+
+export const uploadArrivalInspectionFiles = upload.fields([
+  { name: 'inspectionDocument', maxCount: 1 },
+  { name: 'responseLetter', maxCount: 1 }
+])

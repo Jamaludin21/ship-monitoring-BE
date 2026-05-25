@@ -54,7 +54,9 @@ export const updateLocation = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({
       message: 'Lokasi berhasil diperbarui'
     })
-  } catch {
+  } catch (error) {
+    console.error(error)
+
     return res.status(500).json({
       message: 'Gagal memperbarui lokasi'
     })

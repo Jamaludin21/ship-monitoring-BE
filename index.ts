@@ -5,11 +5,13 @@ import locationRoutes from './routes/locationRoutes'
 import shipRoutes from './routes/shipRoutes'
 import submissionRoutes from './routes/submissionRoutes'
 import { errorMiddleware, notFoundHandler } from './middlewares/errorMiddleware'
+import { requestLogger } from './middlewares/requestLoggerMiddleware'
 
 const cors = require('cors') as any
 const app = express()
 
 app.use(cors())
+app.use(requestLogger)
 app.use(express.json())
 
 app.use('/api/auth', authRoutes)
