@@ -1,4 +1,9 @@
-import { InspectionCondition, Role, Status } from '@prisma/client'
+import {
+  InspectionCondition,
+  ManagerDecision,
+  Role,
+  Status
+} from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { navigationInspectionChecklist } from '../services/navigationInspectionChecklist'
 import prisma from '../utils/prisma'
@@ -29,6 +34,8 @@ async function main () {
   await prisma.location.deleteMany()
   await prisma.navigationInspectionItem.deleteMany()
   await prisma.arrivalInspection.deleteMany()
+  await prisma.managerValidation.deleteMany()
+  await prisma.adminVerification.deleteMany()
   await prisma.submission.deleteMany()
   await prisma.ship.deleteMany()
   await prisma.user.deleteMany()
@@ -218,7 +225,7 @@ async function main () {
         status: Status.APPROVED,
         submittedAt: daysAgo(7),
         reviewedAt: daysAgo(6),
-        reviewedBy: admin.id
+        reviewedBy: manager.id
       },
       {
         shipId: kapalHistoryApproved.id,
@@ -233,7 +240,7 @@ async function main () {
         status: Status.APPROVED,
         submittedAt: daysAgo(20),
         reviewedAt: daysAgo(19),
-        reviewedBy: admin.id
+        reviewedBy: manager.id
       },
       {
         shipId: kapalHistoryApproved.id,
@@ -245,7 +252,7 @@ async function main () {
         callSignCertificateUrl: dummyPdfUrl,
         safetyCertificateUrl: dummyPdfUrl,
         radioStationPermitUrl: dummyPdfUrl,
-        status: Status.PENDING,
+        status: Status.WAITING_MANAGER_VALIDATION,
         submittedAt: daysAgo(1)
       },
       {
@@ -263,7 +270,7 @@ async function main () {
           'Dokumen Sertifikat Keselamatan belum jelas dan perlu diunggah ulang.',
         submittedAt: daysAgo(3),
         reviewedAt: daysAgo(2),
-        reviewedBy: admin.id
+        reviewedBy: manager.id
       },
       {
         shipId: kapalTanpaLokasi.id,
@@ -279,6 +286,54 @@ async function main () {
         submittedAt: daysAgo(2)
       }
     ]
+  })
+
+  const adminVerifiedSubmissions = await prisma.submission.findMany({
+    where: {
+      status: {
+        in: [
+          Status.WAITING_MANAGER_VALIDATION,
+          Status.APPROVED,
+          Status.REJECTED
+        ]
+      }
+    },
+    select: {
+      id: true,
+      status: true,
+      reviewNote: true,
+      reviewedAt: true
+    }
+  })
+
+  await prisma.adminVerification.createMany({
+    data: adminVerifiedSubmissions.map((submission) => ({
+      submissionId: submission.id,
+      verificationDocumentUrl: dummyPdfUrl,
+      note: 'Dokumen pengajuan telah diperiksa oleh admin pelabuhan.',
+      verifiedBy: admin.id,
+      verifiedAt: minutesAgo(45)
+    }))
+  })
+
+  const managerValidatedSubmissions = adminVerifiedSubmissions.filter(
+    (submission) =>
+      submission.status === Status.APPROVED ||
+      submission.status === Status.REJECTED
+  )
+
+  await prisma.managerValidation.createMany({
+    data: managerValidatedSubmissions.map((submission) => ({
+      submissionId: submission.id,
+      decision:
+        submission.status === Status.APPROVED
+          ? ManagerDecision.APPROVED
+          : ManagerDecision.REJECTED,
+      validationDocumentUrl: dummyPdfUrl,
+      note: submission.reviewNote,
+      validatedBy: manager.id,
+      validatedAt: submission.reviewedAt ?? minutesAgo(30)
+    }))
   })
 
   const inspectedSubmission = await prisma.submission.findFirst({

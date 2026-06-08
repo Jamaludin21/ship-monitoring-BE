@@ -13,6 +13,10 @@ const arrivalInspectionUrlFields = [
   'responseLetterUrl'
 ] as const
 
+const adminVerificationUrlFields = ['verificationDocumentUrl'] as const
+
+const managerValidationUrlFields = ['validationDocumentUrl'] as const
+
 export type FileAccessTokenPayload = {
   blobUrl: string
   fileName?: string
@@ -122,6 +126,36 @@ const rewriteDocumentUrlFields = <T extends Record<string, any>>(
   return formattedData
 }
 
+export const formatAdminVerificationDocumentUrls = <T>(
+  req: Request,
+  verification: T
+) => {
+  if (!verification || typeof verification !== 'object') {
+    return verification
+  }
+
+  return rewriteDocumentUrlFields(
+    req,
+    verification as Record<string, any>,
+    adminVerificationUrlFields
+  )
+}
+
+export const formatManagerValidationDocumentUrls = <T>(
+  req: Request,
+  validation: T
+) => {
+  if (!validation || typeof validation !== 'object') {
+    return validation
+  }
+
+  return rewriteDocumentUrlFields(
+    req,
+    validation as Record<string, any>,
+    managerValidationUrlFields
+  )
+}
+
 export const formatSubmissionDocumentUrls = <T>(req: Request, submission: T) => {
   if (!submission || typeof submission !== 'object') {
     return submission
@@ -141,6 +175,26 @@ export const formatSubmissionDocumentUrls = <T>(req: Request, submission: T) => 
       req,
       formattedSubmission.arrivalInspection,
       arrivalInspectionUrlFields
+    )
+  }
+
+  if (
+    formattedSubmission.adminVerification &&
+    typeof formattedSubmission.adminVerification === 'object'
+  ) {
+    formattedSubmission.adminVerification = formatAdminVerificationDocumentUrls(
+      req,
+      formattedSubmission.adminVerification
+    )
+  }
+
+  if (
+    formattedSubmission.managerValidation &&
+    typeof formattedSubmission.managerValidation === 'object'
+  ) {
+    formattedSubmission.managerValidation = formatManagerValidationDocumentUrls(
+      req,
+      formattedSubmission.managerValidation
     )
   }
 

@@ -2,7 +2,9 @@ import express from 'express'
 import { authenticate } from '../middlewares/authMiddleware'
 import { authorizeRoles } from '../middlewares/roleMiddleware'
 import {
+  uploadAdminVerificationFile,
   uploadArrivalInspectionFiles,
+  uploadManagerValidationFile,
   uploadSubmissionFiles
 } from '../middlewares/uploadMiddleware'
 import {
@@ -16,6 +18,8 @@ import {
   getSubmissionDetail,
   getShipHistory,
   getMySubmissionHistory,
+  upsertAdminVerification,
+  submitManagerValidation,
   approveSubmission,
   rejectSubmission
 } from '../controllers/submissionController'
@@ -59,6 +63,22 @@ router.put(
   authorizeRoles('ADMIN'),
   uploadArrivalInspectionFiles,
   upsertArrivalInspection
+)
+
+router.put(
+  '/:id/admin-verification',
+  authenticate,
+  authorizeRoles('ADMIN'),
+  uploadAdminVerificationFile,
+  upsertAdminVerification
+)
+
+router.put(
+  '/:id/manager-validation',
+  authenticate,
+  authorizeRoles('MANAGER'),
+  uploadManagerValidationFile,
+  submitManagerValidation
 )
 
 router.get(

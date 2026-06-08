@@ -4,8 +4,9 @@ const storage = multer.memoryStorage()
 
 const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
   const allowedMimeTypes = ['application/pdf']
+  const hasPdfExtension = file.originalname.toLowerCase().endsWith('.pdf')
 
-  if (!allowedMimeTypes.includes(file.mimetype)) {
+  if (!allowedMimeTypes.includes(file.mimetype) && !hasPdfExtension) {
     return cb(new Error('File harus berformat PDF'))
   }
 
@@ -31,3 +32,7 @@ export const uploadArrivalInspectionFiles = upload.fields([
   { name: 'inspectionDocument', maxCount: 1 },
   { name: 'responseLetter', maxCount: 1 }
 ])
+
+export const uploadAdminVerificationFile = upload.single('verificationDocument')
+
+export const uploadManagerValidationFile = upload.single('validationDocument')

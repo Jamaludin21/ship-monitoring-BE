@@ -17,6 +17,12 @@ enum Role {
 // Mendefinisikan Status Pengajuan
 enum Status {
   PENDING
+  WAITING_MANAGER_VALIDATION
+  APPROVED
+  REJECTED
+}
+
+enum ManagerDecision {
   APPROVED
   REJECTED
 }
@@ -29,7 +35,9 @@ model User {
   name      String
   createdAt DateTime @default(now())
 
-  ships Ship[]
+  ships              Ship[]
+  adminVerifications AdminVerification[]
+  managerValidations ManagerValidation[]
 }
 
 model Ship {
@@ -65,10 +73,50 @@ model Submission {
   updatedAt              DateTime  @updatedAt
 
   arrivalInspection ArrivalInspection?
+  adminVerification AdminVerification?
+  managerValidation ManagerValidation?
 
   @@index([shipId])
   @@index([status])
   @@index([submittedAt])
+}
+
+model AdminVerification {
+  id                      String   @id @default(uuid())
+  submissionId            String   @unique
+  verificationDocumentKey String?
+  verificationDocumentUrl String?
+  note                    String?
+  verifiedBy              String
+  verifiedAt              DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  verifier   User       @relation(fields: [verifiedBy], references: [id])
+
+  @@index([verifiedBy])
+  @@index([verifiedAt])
+}
+
+model ManagerValidation {
+  id                    String          @id @default(uuid())
+  submissionId          String          @unique
+  decision              ManagerDecision
+  validationDocumentKey String?
+  validationDocumentUrl String?
+  note                  String?
+  validatedBy           String
+  validatedAt           DateTime        @default(now())
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  validator  User       @relation(fields: [validatedBy], references: [id])
+
+  @@index([validatedBy])
+  @@index([validatedAt])
+  @@index([decision])
 }
 
 enum InspectionCondition {

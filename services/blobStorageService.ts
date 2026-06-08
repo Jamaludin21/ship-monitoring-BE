@@ -41,6 +41,19 @@ export const uploadToPrivateBlob = async (
   return blob.url
 }
 
+export const getBlobPathnameFromUrl = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  try {
+    const pathname = new URL(value).pathname.replace(/^\/+/, '')
+    return pathname.length > 0 ? decodeURIComponent(pathname) : null
+  } catch {
+    return null
+  }
+}
+
 export const isBlobStorageConfigError = (error: unknown) => {
   return error instanceof Error && error.message === blobConfigErrorMessage
 }
