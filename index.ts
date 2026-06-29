@@ -30,7 +30,12 @@ app.get('/api/health', (req, res) => {
 app.use(notFoundHandler)
 app.use(errorMiddleware)
 
-if (process.env.NODE_ENV !== 'production') {
+// Vercel berjalan serverless sehingga tidak perlu app.listen().
+// Di VPS / server biasa, set START_SERVER="true" agar server mulai mendengarkan port.
+const shouldListen =
+  process.env.START_SERVER === 'true' || process.env.NODE_ENV !== 'production'
+
+if (shouldListen) {
   const PORT = process.env.PORT || 3000
 
   app.listen(PORT, () => {

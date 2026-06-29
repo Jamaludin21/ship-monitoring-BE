@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // url TIDAK BOLEH ADA DI SINI LAGI
+  // url TIDAK BOLEH ADA DI SINI LAGI (disediakan oleh prisma.config.ts)
 }
 
 // Mendefinisikan Role Pengguna
@@ -27,13 +27,18 @@ enum ManagerDecision {
   REJECTED
 }
 
+enum InspectionCondition {
+  YES
+  NO
+}
+
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  username  String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255)
   role      Role
-  name      String
-  createdAt DateTime @default(now())
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamp(3)
 
   ships              Ship[]
   adminVerifications AdminVerification[]
@@ -41,36 +46,37 @@ model User {
 }
 
 model Ship {
-  id          String       @id @default(uuid())
-  shipNumber  String       @unique
-  name        String
-  captainId   String
-  captain     User         @relation(fields: [captainId], references: [id])
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  shipNumber String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(100)
+  captainId  String   @db.VarChar(36)
+  captain    User     @relation(fields: [captainId], references: [id])
+  createdAt  DateTime @default(now()) @db.Timestamp(3)
+  updatedAt  DateTime @updatedAt @db.Timestamp(3)
+
   submissions Submission[]
   locations   Location[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
 }
 
 model Submission {
-  id                     String    @id @default(uuid())
-  shipId                 String
+  id                     String    @id @default(uuid()) @db.VarChar(36)
+  shipId                 String    @db.VarChar(36)
   ship                   Ship      @relation(fields: [shipId], references: [id])
-  captainName            String
+  captainName            String    @db.VarChar(100)
   employeeCount          Int
-  cargo                  String
-  cargoAmount            String
-  sailingPermitUrl       String
-  callSignCertificateUrl String
-  safetyCertificateUrl   String
-  radioStationPermitUrl  String
+  cargo                  String    @db.VarChar(150)
+  cargoAmount            String    @db.VarChar(50)
+  sailingPermitUrl       String    @db.VarChar(500)
+  callSignCertificateUrl String    @db.VarChar(500)
+  safetyCertificateUrl   String    @db.VarChar(500)
+  radioStationPermitUrl  String    @db.VarChar(500)
   status                 Status    @default(PENDING)
-  reviewNote             String?
-  submittedAt            DateTime  @default(now())
-  reviewedAt             DateTime?
-  reviewedBy             String?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  reviewNote             String?   @db.VarChar(500)
+  submittedAt            DateTime  @default(now()) @db.Timestamp(3)
+  reviewedAt             DateTime? @db.Timestamp(3)
+  reviewedBy             String?   @db.VarChar(36)
+  createdAt              DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamp(3)
 
   arrivalInspection ArrivalInspection?
   adminVerification AdminVerification?
@@ -82,15 +88,15 @@ model Submission {
 }
 
 model AdminVerification {
-  id                      String   @id @default(uuid())
-  submissionId            String   @unique
-  verificationDocumentKey String?
-  verificationDocumentUrl String?
-  note                    String?
-  verifiedBy              String
-  verifiedAt              DateTime @default(now())
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                      String   @id @default(uuid()) @db.VarChar(36)
+  submissionId            String   @unique @db.VarChar(36)
+  verificationDocumentKey String?  @db.VarChar(500)
+  verificationDocumentUrl String?  @db.VarChar(500)
+  note                    String?  @db.VarChar(500)
+  verifiedBy              String   @db.VarChar(36)
+  verifiedAt              DateTime @default(now()) @db.Timestamp(3)
+  createdAt               DateTime @default(now()) @db.Timestamp(3)
+  updatedAt               DateTime @updatedAt @db.Timestamp(3)
 
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   verifier   User       @relation(fields: [verifiedBy], references: [id])
@@ -100,16 +106,16 @@ model AdminVerification {
 }
 
 model ManagerValidation {
-  id                    String          @id @default(uuid())
-  submissionId          String          @unique
+  id                    String          @id @default(uuid()) @db.VarChar(36)
+  submissionId          String          @unique @db.VarChar(36)
   decision              ManagerDecision
-  validationDocumentKey String?
-  validationDocumentUrl String?
-  note                  String?
-  validatedBy           String
-  validatedAt           DateTime        @default(now())
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  validationDocumentKey String?         @db.VarChar(500)
+  validationDocumentUrl String?         @db.VarChar(500)
+  note                  String?         @db.VarChar(500)
+  validatedBy           String          @db.VarChar(36)
+  validatedAt           DateTime        @default(now()) @db.Timestamp(3)
+  createdAt             DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt             DateTime        @updatedAt @db.Timestamp(3)
 
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   validator  User       @relation(fields: [validatedBy], references: [id])
@@ -119,22 +125,17 @@ model ManagerValidation {
   @@index([decision])
 }
 
-enum InspectionCondition {
-  YES
-  NO
-}
-
 model ArrivalInspection {
-  id                    String                     @id @default(uuid())
-  submissionId          String                     @unique
+  id                    String                     @id @default(uuid()) @db.VarChar(36)
+  submissionId          String                     @unique @db.VarChar(36)
   submission            Submission                 @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  inspectionDocumentUrl String?
-  responseLetterUrl     String?
-  note                  String?
-  checkedBy             String
-  checkedAt             DateTime                   @default(now())
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
+  inspectionDocumentUrl String?                    @db.VarChar(500)
+  responseLetterUrl     String?                    @db.VarChar(500)
+  note                  String?                    @db.VarChar(500)
+  checkedBy             String                     @db.VarChar(36)
+  checkedAt             DateTime                   @default(now()) @db.Timestamp(3)
+  createdAt             DateTime                   @default(now()) @db.Timestamp(3)
+  updatedAt             DateTime                   @updatedAt @db.Timestamp(3)
   items                 NavigationInspectionItem[]
 
   @@index([checkedBy])
@@ -142,27 +143,27 @@ model ArrivalInspection {
 }
 
 model NavigationInspectionItem {
-  id           String              @id @default(uuid())
-  inspectionId String
+  id           String              @id @default(uuid()) @db.VarChar(36)
+  inspectionId String              @db.VarChar(36)
   inspection   ArrivalInspection   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   itemNo       Int
-  question     String
+  question     String              @db.VarChar(255)
   condition    InspectionCondition
-  note         String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  note         String?             @db.VarChar(500)
+  createdAt    DateTime            @default(now()) @db.Timestamp(3)
+  updatedAt    DateTime            @updatedAt @db.Timestamp(3)
 
   @@unique([inspectionId, itemNo])
   @@index([inspectionId])
 }
 
 model Location {
-  id        String   @id @default(uuid())
-  shipId    String
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  shipId    String   @db.VarChar(36)
   ship      Ship     @relation(fields: [shipId], references: [id])
-  latitude  Float
-  longitude Float
-  createdAt DateTime @default(now())
+  latitude  Float    @db.DoublePrecision
+  longitude Float    @db.DoublePrecision
+  createdAt DateTime @default(now()) @db.Timestamp(3)
 
   @@index([shipId])
   @@index([createdAt])
